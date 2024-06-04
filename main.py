@@ -5,7 +5,10 @@ from datetime import datetime, timezone
 from rich.table import Table
 import pytz
 import math
-
+import time
+from textual.app import App, ComposeResult
+from textual.containers import Container
+from textual.widgets import Header, Footer, ListView, Static
 console = Console()
 url = "https://v6.bvg.transport.rest/stops/${}/departures?pretty=true&suburban=true&subway=true&tram=true&bus=true&ferry=false&express=false&regional=true"
 stations = []
@@ -53,9 +56,24 @@ a = {
     'currentTripPosition': {'type': 'location', 'latitude': 52.533239, 'longitude': 13.439206},
     'occupancy': 'low'
 }
+class StopwatchApp(App):
+    BINDINGS = [("d", "toggle_dark", "Toggle dark mode")]
+    CSS_PATH = "vert.tcss"
+    def action_toggle_dark(self) -> None:
+        self.dark = not self.dark
+    def compose(self) -> ComposeResult:
+        yield Header()
+        yield Container(
+            Static("One", classes="box"),
+            Static("One", classes="box"),
+            Static("One", classes="box"),
+            Static("One", classes="box"),
+            Static("One", classes="box"),
+            Static("One", classes="box")
+        )
+        yield Footer()
 
 def getStationData(stationId):
-    print(url.replace("${}",stationId))
     headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/56.0.2924.76 Safari/537.36', "Upgrade-Insecure-Requests": "1","DNT": "1","Accept": "*/*","Accept-Language": "en-US,en;q=0.5","Accept-Encoding": "gzip, deflate"}
     r = requests.get(url.replace("${}",stationId), headers=headers)
 
@@ -76,19 +94,29 @@ def getStationData(stationId):
         else: 
             berlin_tz = pytz.timezone("Europe/Berlin")
             c = plannedWhen - datetime.now(berlin_tz)
+            print(c.seconds, plannedWhen, datetime.now(berlin_tz))
             if ((c.seconds/60) > 0 and (c.seconds/60) < 1):
                 deltaString = f"In less than a minute"
             elif (c.seconds/60) > 0:
                 deltaString = f"In [bold]{math.floor(c.seconds/60)}[/bold] minute(s)"
             elif (c == 0):
                 deltaString = "[green]Right now![/green]"
-            table.add_row(str(departure["line"]["product"])[0].upper()+str(departure["line"]["product"])[1:] + " nach " + departure['destination']["name"], f"{deltaString}")
+            elif (c < 0):
+                deltaString = f"[red][bold]{math.floor(c.seconds/60)}[/bold] minute(s) ago[/red]"
+            table.add_row(str(departure["line"]["product"])[0].upper()+str(departure["line"]["product"])[1:], "" + " nach " + departure['destination']["name"], f"{deltaString}")
+    
+    # console.print(table)
+# getStationData("900193002")
+# time.sleep(2)
+# console.clear()
+# getStationData("900120014")
+# time.sleep(2)
+# console.clear()
+# getStationData("900120001")
+# console.clear()
+# time.sleep(2)
+# getStationData("900120025")
 
-    console.print(table)
-getStationData("900193002")
-getStationData("900120014")
-getStationData("900120001")
-getStationData("900120025")
-
-
-
+if __name__ == "__main__":
+    app = StopwatchApp()
+    app.run()
