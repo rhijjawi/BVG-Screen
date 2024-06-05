@@ -8,70 +8,52 @@ import math
 import time
 from textual.app import App, ComposeResult
 from textual.containers import Container
-from textual.widgets import Header, Footer, ListView, Static
+from textual.widgets import Header, Footer, ListView, Static, DataTable
+
 console = Console()
 url = "https://v6.bvg.transport.rest/stops/${}/departures?pretty=true&suburban=true&subway=true&tram=true&bus=true&ferry=false&express=false&regional=true"
-stations = []
+stations = ["900193002","900120014","900120001","900120025"]
+berlin_tz = pytz.timezone("Europe/Berlin")
 requests.packages.urllib3.util.connection.HAS_IPV6 = False
-a = {
-    'tripId': '1|64221|2|86|4062024',
-    'stop': {
-        'type': 'stop',
-        'id': '900120014',
-        'name': 'Grünberger Str./Warschauer Str. (Berlin)',
-        'location': {'type': 'location', 'id': '900120014', 'latitude': 52.512402, 'longitude': 13.452393},
-        'products': {'suburban': False, 'subway': False, 'tram': True, 'bus': True, 'ferry': False, 'express': False, 'regional': False},
-        'stationDHID': 'de:11000:900120014'
-    },
-    'when': '2024-06-04T20:36:00+02:00',
-    'plannedWhen': '2024-06-04T20:31:00+02:00',
-    'delay': 300,
-    'platform': None,
-    'plannedPlatform': None,
-    'prognosisType': 'prognosed',
-    'direction': 'S+U Warschauer Str.',
-    'provenance': None,
-    'line': {
-        'type': 'line',
-        'id': 'm10',
-        'fahrtNr': '20466',
-        'name': 'M10',
-        'public': True,
-        'adminCode': 'BVT---',
-        'productName': 'Tram',
-        'mode': 'train',
-        'product': 'tram',
-        'operator': {'type': 'operator', 'id': 'berliner-verkehrsbetriebe', 'name': 'Berliner Verkehrsbetriebe'}
-    },
-    'remarks': [{'type': 'hint', 'code': 'FK', 'text': 'Bicycle conveyance'}],
-    'origin': None,
-    'destination': {
-        'type': 'stop',
-        'id': '900120004',
-        'name': 'S+U Warschauer Str. (Berlin)',
-        'location': {'type': 'location', 'id': '900120004', 'latitude': 52.505768, 'longitude': 13.449157},
-        'products': {'suburban': True, 'subway': True, 'tram': True, 'bus': True, 'ferry': False, 'express': False, 'regional': False},
-        'stationDHID': 'de:11000:900120004'
-    },
-    'currentTripPosition': {'type': 'location', 'latitude': 52.533239, 'longitude': 13.439206},
-    'occupancy': 'low'
-}
-class StopwatchApp(App):
+
+
+class ArrivalKiosk(App):
     BINDINGS = [("d", "toggle_dark", "Toggle dark mode")]
     CSS_PATH = "vert.tcss"
+
     def action_toggle_dark(self) -> None:
         self.dark = not self.dark
+
     def compose(self) -> ComposeResult:
         yield Header()
-        yield Container(
-            Static("One", classes="box"),
-            Static("One", classes="box"),
-            Static("One", classes="box"),
-            Static("One", classes="box"),
-            Static("One", classes="box"),
-            Static("One", classes="box")
-        )
+        yield DataTable()
         yield Footer()
+
+    def on_mount(self) -> None:
+        table = self.query_one(DataTable)
+        table.add_columns("Line", "Direction", "departure")
+        self.set_interval(3,self.get_stations)
+
+    async def get_stations(self) -> None:
+        table = self.query_one(DataTable)
+        newRow = []
+        newRow = getFilteredDepartures(stations[1])[0]
+        table.add_row(newRow["line_name"],newRow["direction"],newRow["minutes"])
+
+app = ArrivalKiosk()
+
+def getFilteredDepartures(stationId):
+    r = requests.get(url.replace("${}", stationId))
+    filtered_departures = []
+
+    for departure in r.json()["departures"]:
+        if "when" in departure and "direction" in departure and  "name" in departure["line"]:
+            filtered_departures.append({
+                "line_name": departure["line"]["name"],
+                "direction": departure["direction"],
+                "minutes": math.floor((datetime.strptime(departure["when"], "%Y-%m-%dT%H:%M:%S%z")-datetime.now(berlin_tz)).seconds/60)
+            })
+    return filtered_departures
 
 def getStationData(stationId):
     headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/56.0.2924.76 Safari/537.36', "Upgrade-Insecure-Requests": "1","DNT": "1","Accept": "*/*","Accept-Language": "en-US,en;q=0.5","Accept-Encoding": "gzip, deflate"}
@@ -104,19 +86,6 @@ def getStationData(stationId):
             elif (c < 0):
                 deltaString = f"[red][bold]{math.floor(c.seconds/60)}[/bold] minute(s) ago[/red]"
             table.add_row(str(departure["line"]["product"])[0].upper()+str(departure["line"]["product"])[1:], "" + " nach " + departure['destination']["name"], f"{deltaString}")
-    
-    # console.print(table)
-# getStationData("900193002")
-# time.sleep(2)
-# console.clear()
-# getStationData("900120014")
-# time.sleep(2)
-# console.clear()
-# getStationData("900120001")
-# console.clear()
-# time.sleep(2)
-# getStationData("900120025")
 
 if __name__ == "__main__":
-    app = StopwatchApp()
     app.run()

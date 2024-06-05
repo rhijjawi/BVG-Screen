@@ -1,0 +1,4 @@
+TerminusBold
+/boot/config.txt
+960x540
+
