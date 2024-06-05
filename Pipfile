@@ -8,6 +8,8 @@ rich = "*"
 requests = "*"
 pytz = "*"
 textual = "*"
+asyncio = "*"
+aiohttp = "*"
 
 [dev-packages]
 
