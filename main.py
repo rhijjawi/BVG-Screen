@@ -43,8 +43,8 @@ async def asyncGetFilteredDepartures():
     stations = ["900193002","900120014","900120001","900120025"]
 #    stations = ["900120025"]
     filtered_departures = await parse_destinations(stations)
-    return sorted(filtered_departures, key=lambda x: x['minutes'])
-
+    # this should look a lot cleaner, I don't love such oneliners
+    return sorted([x for x in filtered_departures if 2 <= x['minutes'] <= 30], key=lambda x: x['minutes'])
 
 
 class ArrivalKiosk(App):
@@ -62,12 +62,11 @@ class ArrivalKiosk(App):
     def on_mount(self) -> None:
         table = self.query_one(DataTable)
         table.add_columns("Line", "Direction", "departure")
-        self.set_interval(3,self.get_stations)
+        self.set_interval(5,self.get_stations)
 
     async def get_stations(self) -> None:
         table = self.query_one(DataTable)
-        # newRow = []
-        # newRow = getFilteredDepartures(stations[1])[0]
+        table.clear()
         newRows = await asyncGetFilteredDepartures()
         for newRow in newRows:
             table.add_row(newRow["line_name"],newRow["direction"],newRow["minutes"])
